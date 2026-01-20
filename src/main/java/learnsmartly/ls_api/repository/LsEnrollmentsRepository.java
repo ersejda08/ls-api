@@ -5,11 +5,12 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import learnsmartly.ls_api.entity.EnrollmentStatus;
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.entity.LsUser;
 
-public interface LsEnrollmentRepository extends JpaRepository<LsEnrollments, Long> {
+public interface LsEnrollmentsRepository extends JpaRepository<LsEnrollments, Long> {
 
     // Prevent duplicate enrollments
     boolean existsByCourseAndStudent(LsCourses course, LsUser student);
@@ -21,4 +22,6 @@ public interface LsEnrollmentRepository extends JpaRepository<LsEnrollments, Lon
 
     // Teacher: list enrollments for a course
     List<LsEnrollments> findByCourseId(Long courseId);
+
+    long countByCourseIdAndStatus(Long courseId, EnrollmentStatus approved);
 }
