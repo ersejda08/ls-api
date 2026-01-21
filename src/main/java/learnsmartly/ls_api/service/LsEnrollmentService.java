@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.entity.LsUser;
@@ -38,21 +37,22 @@ public class LsEnrollmentService {
         LsUser student = userRepository.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + studentId));
 
-        // Minimal duplicate prevention (important even without auth)
+        // Prevent duplicate enrollments
         if (enrollmentsRepository.existsByCourseAndStudent(course, student)) {
             throw new IllegalArgumentException("Student is already enrolled in this course");
         }
 
-        // Capacity logic (simple)
-        // We will consider APPROVED enrollments as occupying capacity.
-        long approvedCount = enrollmentsRepository.countByCourseId(courseId);
+        
+        long currentEnrollmentCount = enrollmentsRepository.countByCourseId(courseId);
+        Integer capacity = course.getCapacity();
 
-   
+        if (capacity != null && currentEnrollmentCount >= capacity) {
+            throw new IllegalArgumentException("Course is full");
+        }
 
         LsEnrollments enrollment = new LsEnrollments();
         enrollment.setCourse(course);
         enrollment.setStudent(student);
-      
 
         return enrollmentsRepository.save(enrollment);
     }
