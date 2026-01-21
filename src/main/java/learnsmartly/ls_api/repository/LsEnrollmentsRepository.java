@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import learnsmartly.ls_api.entity.EnrollmentStatus;
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.entity.LsUser;
@@ -23,5 +22,5 @@ public interface LsEnrollmentsRepository extends JpaRepository<LsEnrollments, Lo
     // Teacher: list enrollments for a course
     List<LsEnrollments> findByCourseId(Long courseId);
 
-    long countByCourseIdAndStatus(Long courseId, EnrollmentStatus approved);
+    long countByCourseId(Long courseId);
 }

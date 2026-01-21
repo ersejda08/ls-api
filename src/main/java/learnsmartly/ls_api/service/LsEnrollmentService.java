@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import learnsmartly.ls_api.entity.EnrollmentStatus;
+
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.entity.LsUser;
@@ -45,16 +45,14 @@ public class LsEnrollmentService {
 
         // Capacity logic (simple)
         // We will consider APPROVED enrollments as occupying capacity.
-        long approvedCount = enrollmentsRepository.countByCourseIdAndStatus(courseId, EnrollmentStatus.APPROVED);
+        long approvedCount = enrollmentsRepository.countByCourseId(courseId);
 
-        EnrollmentStatus status = (approvedCount >= course.getCapacity())
-                ? EnrollmentStatus.WAITLISTED
-                : EnrollmentStatus.PENDING;
+   
 
         LsEnrollments enrollment = new LsEnrollments();
         enrollment.setCourse(course);
         enrollment.setStudent(student);
-        enrollment.setStatus(status);
+      
 
         return enrollmentsRepository.save(enrollment);
     }
