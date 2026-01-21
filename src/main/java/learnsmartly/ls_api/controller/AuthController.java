@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import learnsmartly.ls_api.entity.LsUser;
+import learnsmartly.ls_api.entity.UserRole;
 import learnsmartly.ls_api.repository.LsUserRepository;
 import learnsmartly.ls_api.security.JwtService;
 import learnsmartly.ls_api.dto.request.LoginRequestDTO;
@@ -36,13 +37,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO req) {
-        // adjust field names if your DTOs differ
-        if (req.getEmail() == null || req.getPassword() == null) {
-            return ResponseEntity.badRequest().build();
-        }
 
-        Optional<LsUser> existing = userRepository.findByEmail(req.getEmail());
-        if (existing.isPresent()) {
+        if (userRepository.existsByEmail(req.getEmail())) {
             return ResponseEntity.badRequest().build();
         }
 
@@ -50,22 +46,23 @@ public class AuthController {
         user.setUsername(req.getUsername());
         user.setEmail(req.getEmail());
         user.setPassword(passwordEncoder.encode(req.getPassword()));
+        user.setPhoneNumber(req.getPhoneNumber());
+        user.setAddress(req.getAddress());
+
+        // default role
+        UserRole role = req.getRole() == null ? UserRole.STUDENT : req.getRole();
+        user.setRole(role);
 
         LsUser saved = userRepository.save(user);
 
         String token = jwtService.generateToken(saved);
-
-        // build MeResponseDTO with role (matching available constructor) and return AuthResponseDTO(token, me)
         MeResponseDTO me = new MeResponseDTO(saved.getId(), saved.getUsername(), saved.getEmail(), saved.getRole());
-        AuthResponseDTO resp = new AuthResponseDTO(token, me);
-        return ResponseEntity.ok(resp);
+
+        return ResponseEntity.ok(new AuthResponseDTO(token, me));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO req) {
-        if (req.getEmail() == null || req.getPassword() == null) {
-            return ResponseEntity.badRequest().build();
-        }
 
         Optional<LsUser> userOpt = userRepository.findByEmail(req.getEmail());
         if (userOpt.isEmpty()) {
@@ -78,25 +75,27 @@ public class AuthController {
         }
 
         String token = jwtService.generateToken(user);
-
         MeResponseDTO me = new MeResponseDTO(user.getId(), user.getUsername(), user.getEmail(), user.getRole());
+
         return ResponseEntity.ok(new AuthResponseDTO(token, me));
     }
 
     @GetMapping("/me")
     public ResponseEntity<MeResponseDTO> me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
+        if (auth == null || auth.getPrincipal() == null) {
             return ResponseEntity.status(401).build();
         }
 
-        Optional<LsUser> userOpt = userRepository.findByEmail(auth.getName());
+        // JwtAuthFilter sets principal = userId
+        Long userId = Long.valueOf(auth.getPrincipal().toString());
+
+        Optional<LsUser> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         LsUser u = userOpt.get();
-        MeResponseDTO dto = new MeResponseDTO(u.getId(), u.getUsername(), u.getEmail(), u.getRole());
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(new MeResponseDTO(u.getId(), u.getUsername(), u.getEmail(), u.getRole()));
     }
 }

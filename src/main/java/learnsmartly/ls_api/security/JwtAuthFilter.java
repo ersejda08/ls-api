@@ -40,13 +40,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = header.substring(7);
 
-        if (!jwtService.isValid(token)) {
+        if (!jwtService.isTokenValid(token)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         Long userId = jwtService.extractUserId(token);
-        String role = jwtService.extractRole(token); // STUDENT / TEACHER
+        String role = jwtService.extractRole(token);
+
+        if (role == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
         var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
