@@ -12,9 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.service.LsEnrollmentService;
 
-
 @RestController
-@RequestMapping("/api/enrollments")
+@RequestMapping("/api")
 public class LsEnrollmentController {
 
     private final LsEnrollmentService enrollmentService;
@@ -23,19 +22,32 @@ public class LsEnrollmentController {
         this.enrollmentService = enrollmentService;
     }
 
-    // enroll: courseId + studentId (temporary until JWT)
-    @PostMapping
-    public LsEnrollments enroll(@RequestParam Long courseId, @RequestParam Long studentId) {
+    /**
+     * STUDENT action (temporary until JWT):
+     * Enroll a student into a course.
+     * Later: remove studentId from request and take it from the JWT (logged-in user).
+     */
+    @PostMapping("/courses/{courseId}/enroll")
+    public LsEnrollments enroll(@PathVariable Long courseId, @RequestParam Long studentId) {
         return enrollmentService.enroll(courseId, studentId);
     }
 
-    @GetMapping("/by-student/{studentId}")
-    public List<LsEnrollments> byStudent(@PathVariable Long studentId) {
+    /**
+     * STUDENT action (temporary until JWT):
+     * View my enrollments.
+     * Later: remove studentId from request and take it from the JWT (logged-in user).
+     */
+    @GetMapping("/my/enrollments")
+    public List<LsEnrollments> myEnrollments(@RequestParam Long studentId) {
         return enrollmentService.getEnrollmentsByStudent(studentId);
     }
 
-    @GetMapping("/by-course/{courseId}")
-    public List<LsEnrollments> byCourse(@PathVariable Long courseId) {
+    /**
+     * TEACHER action:
+     * View all enrollments (students) for a specific course.
+     */
+    @GetMapping("/courses/{courseId}/enrollments")
+    public List<LsEnrollments> courseEnrollments(@PathVariable Long courseId) {
         return enrollmentService.getEnrollmentsByCourse(courseId);
     }
 }
