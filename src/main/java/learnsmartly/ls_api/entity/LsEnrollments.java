@@ -1,8 +1,6 @@
 package learnsmartly.ls_api.entity;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -32,18 +30,16 @@ public class LsEnrollments {
     @JoinColumn(name = "student_id", nullable = false)
     private LsUser student;
 
-    @Enumerated(EnumType.STRING)
-    private EnrollmentStatus status;
 
     // Constructors
     public LsEnrollments() {
     }
 
-    public LsEnrollments(Long id, LsCourses course, LsUser student, EnrollmentStatus status) {
+    public LsEnrollments(Long id, LsCourses course, LsUser student) {
         this.id = id;
         this.course = course;
         this.student = student;
-        this.status = status;
+       
     }
 
     // Getters and Setters
@@ -71,11 +67,5 @@ public class LsEnrollments {
         this.student = student;
     }
 
-    public EnrollmentStatus getStatus() {
-        return status;
-    }
 
-    public void setStatus(EnrollmentStatus status) {
-        this.status = status;
-    }
 }

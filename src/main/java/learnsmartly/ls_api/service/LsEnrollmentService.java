@@ -5,10 +5,12 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import learnsmartly.ls_api.entity.EnrollmentStatus;
+import learnsmartly.ls_api.dto.response.EnrollmentResponseDTO;
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.entity.LsEnrollments;
 import learnsmartly.ls_api.entity.LsUser;
+import learnsmartly.ls_api.exception.ConflictException;
+import learnsmartly.ls_api.exception.NotFoundException;
 import learnsmartly.ls_api.repository.LsCoursesRepository;
 import learnsmartly.ls_api.repository.LsEnrollmentsRepository;
 import learnsmartly.ls_api.repository.LsUserRepository;
@@ -20,50 +22,76 @@ public class LsEnrollmentService {
     private final LsCoursesRepository coursesRepository;
     private final LsUserRepository userRepository;
 
-    public LsEnrollmentService(
-            LsEnrollmentsRepository enrollmentsRepository,
-            LsCoursesRepository coursesRepository,
-            LsUserRepository userRepository
-    ) {
+    public LsEnrollmentService(LsEnrollmentsRepository enrollmentsRepository,
+                               LsCoursesRepository coursesRepository,
+                               LsUserRepository userRepository) {
         this.enrollmentsRepository = enrollmentsRepository;
         this.coursesRepository = coursesRepository;
         this.userRepository = userRepository;
     }
 
     @Transactional
-    public LsEnrollments enroll(Long courseId, Long studentId) {
-        LsCourses course = coursesRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("Course not found with id: " + courseId));
-
+    public EnrollmentResponseDTO enrollSelf(Long studentId, Long courseId) {
         LsUser student = userRepository.findById(studentId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + studentId));
+                .orElseThrow(() -> new NotFoundException("Student not found: " + studentId));
 
-        // Minimal duplicate prevention (important even without auth)
-        if (enrollmentsRepository.existsByCourseAndStudent(course, student)) {
-            throw new IllegalArgumentException("Student is already enrolled in this course");
+        LsCourses course = coursesRepository.findById(courseId)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
+
+        if (enrollmentsRepository.existsByStudentIdAndCourseId(studentId, courseId)) {
+            throw new ConflictException("You are already enrolled in this course.");
         }
 
-        // Capacity logic (simple)
-        // We will consider APPROVED enrollments as occupying capacity.
-        long approvedCount = enrollmentsRepository.countByCourseIdAndStatus(courseId, EnrollmentStatus.APPROVED);
+        long currentCount = enrollmentsRepository.countByCourseId(courseId);
+        if (course.getCapacity() != null && currentCount >= course.getCapacity()) {
+            throw new ConflictException("Course is full.");
+        }
 
-        EnrollmentStatus status = (approvedCount >= course.getCapacity())
-                ? EnrollmentStatus.WAITLISTED
-                : EnrollmentStatus.PENDING;
+        LsEnrollments e = new LsEnrollments();
+        e.setStudent(student);
+        e.setCourse(course);
 
-        LsEnrollments enrollment = new LsEnrollments();
-        enrollment.setCourse(course);
-        enrollment.setStudent(student);
-        enrollment.setStatus(status);
-
-        return enrollmentsRepository.save(enrollment);
+        LsEnrollments saved = enrollmentsRepository.save(e);
+        return toDTO(saved);
     }
 
-    public List<LsEnrollments> getEnrollmentsByStudent(Long studentId) {
-        return enrollmentsRepository.findByStudentId(studentId);
+    @Transactional
+    public void unenrollSelf(Long studentId, Long courseId) {
+        if (!enrollmentsRepository.existsByStudentIdAndCourseId(studentId, courseId)) {
+            throw new NotFoundException("Enrollment not found for student " + studentId + " and course " + courseId);
+        }
+        enrollmentsRepository.deleteByStudentIdAndCourseId(studentId, courseId);
     }
 
-    public List<LsEnrollments> getEnrollmentsByCourse(Long courseId) {
-        return enrollmentsRepository.findByCourseId(courseId);
+    public List<EnrollmentResponseDTO> listMyEnrollments(Long studentId) {
+        return enrollmentsRepository.findByStudentId(studentId)
+                .stream().map(this::toDTO).toList();
+    }
+
+    public List<EnrollmentResponseDTO> listEnrollmentsForCourse(Long courseId) {
+        // teacher-only endpoint will call this
+        if (!coursesRepository.existsById(courseId)) {
+            throw new NotFoundException("Course not found: " + courseId);
+        }
+        return enrollmentsRepository.findByCourseId(courseId)
+                .stream().map(this::toDTO).toList();
+    }
+
+    public long countEnrollmentsForCourse(Long courseId) {
+        if (!coursesRepository.existsById(courseId)) {
+            throw new NotFoundException("Course not found: " + courseId);
+        }
+        return enrollmentsRepository.countByCourseId(courseId);
+    }
+
+    private EnrollmentResponseDTO toDTO(LsEnrollments e) {
+        return new EnrollmentResponseDTO(
+                e.getId(),
+                e.getStudent().getId(),
+                e.getStudent().getUsername(),
+                e.getStudent().getEmail(),
+                e.getCourse().getId(),
+                e.getCourse().getCourseName()
+        );
     }
 }
