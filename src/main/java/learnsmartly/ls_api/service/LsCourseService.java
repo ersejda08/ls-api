@@ -4,67 +4,75 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import learnsmartly.ls_api.dto.request.CourseRequestDTO;
+import learnsmartly.ls_api.dto.response.CourseResponseDTO;
 import learnsmartly.ls_api.entity.LsCourses;
 import learnsmartly.ls_api.repository.LsCoursesRepository;
+import learnsmartly.ls_api.repository.LsEnrollmentsRepository;
+import learnsmartly.ls_api.exception.NotFoundException;
 
 @Service
 public class LsCourseService {
 
     private final LsCoursesRepository coursesRepository;
+    private final LsEnrollmentsRepository enrollmentsRepository;
 
-    public LsCourseService(LsCoursesRepository coursesRepository) {
+    public LsCourseService(LsCoursesRepository coursesRepository,
+                           LsEnrollmentsRepository enrollmentsRepository) {
         this.coursesRepository = coursesRepository;
+        this.enrollmentsRepository = enrollmentsRepository;
     }
 
-    public LsCourses createCourse(LsCourses course) {
-        // minimal validation (keep simple)
-        if (course.getCourseName() == null || course.getCourseName().trim().isEmpty()) {
-            throw new IllegalArgumentException("courseName is required");
-        }
-        if (course.getCapacity() == null || course.getCapacity() < 1) {
-            throw new IllegalArgumentException("capacity must be >= 1");
-        }
-
-        // Create should NOT accept id (prevents accidental updates)
-        course.setId(null);
-
-        return coursesRepository.save(course);
+    public List<CourseResponseDTO> listAllCourses() {
+        return coursesRepository.findAll().stream()
+                .map(c -> toCourseResponse(c, enrollmentsRepository.countByCourseId(c.getId())))
+                .toList();
     }
 
-    public LsCourses updateCourse(Long id, LsCourses course) {
-        // minimal validation (keep simple)
-        if (course.getCourseName() == null || course.getCourseName().trim().isEmpty()) {
-            throw new IllegalArgumentException("courseName is required");
-        }
-        if (course.getCapacity() == null || course.getCapacity() < 1) {
-            throw new IllegalArgumentException("capacity must be >= 1");
-        }
+    public CourseResponseDTO getCourse(Long id) {
+        LsCourses c = coursesRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + id));
+        long count = enrollmentsRepository.countByCourseId(id);
+        return toCourseResponse(c, count);
+    }
 
-        // Ensure the course exists, then update only the allowed fields
-        LsCourses existing = coursesRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Course not found with id: " + id));
+    public CourseResponseDTO createCourse(CourseRequestDTO req) {
+        LsCourses c = new LsCourses();
+        c.setCourseName(req.getCourseName());
+        c.setDescription(req.getDescription());
+        c.setCapacity(req.getCapacity());
 
-        existing.setCourseName(course.getCourseName());
-        existing.setDescription(course.getDescription());
-        existing.setCapacity(course.getCapacity());
+        LsCourses saved = coursesRepository.save(c);
+        return toCourseResponse(saved, 0);
+    }
 
-        return coursesRepository.save(existing);
+    public CourseResponseDTO updateCourse(Long id, CourseRequestDTO req) {
+        LsCourses c = coursesRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + id));
+
+        c.setCourseName(req.getCourseName());
+        c.setDescription(req.getDescription());
+        c.setCapacity(req.getCapacity());
+
+        LsCourses saved = coursesRepository.save(c);
+        long count = enrollmentsRepository.countByCourseId(id);
+        return toCourseResponse(saved, count);
     }
 
     public void deleteCourse(Long id) {
-        // Ensure the course exists (otherwise delete may silently do nothing)
         if (!coursesRepository.existsById(id)) {
-            throw new IllegalArgumentException("Course not found with id: " + id);
+            throw new NotFoundException("Course not found: " + id);
         }
         coursesRepository.deleteById(id);
     }
 
-    public List<LsCourses> getAllCourses() {
-        return coursesRepository.findAll();
-    }
-
-    public LsCourses getCourseById(Long id) {
-        return coursesRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Course not found with id: " + id));
+    private CourseResponseDTO toCourseResponse(LsCourses c, long enrolledCount) {
+        return new CourseResponseDTO(
+                c.getId(),
+                c.getCourseName(),
+                c.getDescription(),
+                c.getCapacity(),
+                enrolledCount
+        );
     }
 }

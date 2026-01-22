@@ -25,20 +25,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
 
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        if (header == null || !header.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
+        String token = authHeader.substring(7);
 
         if (!jwtService.isTokenValid(token)) {
             filterChain.doFilter(request, response);
@@ -46,17 +44,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         Long userId = jwtService.extractUserId(token);
-        String role = jwtService.extractRole(token);
+        String role = jwtService.extractRole(token); // "TEACHER" or "STUDENT"
 
-        if (role == null) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+        // Spring expects ROLE_ prefix for hasRole()
+        List<SimpleGrantedAuthority> authorities =
+                role == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-        var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-        var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+        var authentication =
+                new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
 
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
         filterChain.doFilter(request, response);
     }
 }
